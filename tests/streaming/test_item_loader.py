@@ -43,6 +43,30 @@ def test_pytreeloader_with_no_header_tensor_serializer(tmpdir):
         assert torch.allclose(i * torch.ones(10).to(_TORCH_DTYPES_MAPPING[dtype_index_long]), item["long"])
 
 
+def test_tokensloader_with_no_header_tensor_serializer(tmpdir):
+    cache = Cache(str(tmpdir), chunk_size=512, item_loader=TokensLoader())
+    assert isinstance(cache._reader._item_loader, TokensLoader)
+    dtype_index_int = 16
+    for i in range(10):
+        data = i * torch.ones(256).to(_TORCH_DTYPES_MAPPING[dtype_index_int])
+        cache._add_item(i, data)
+
+    data_format = [f"no_header_tensor:{dtype_index_int}"]
+    assert cache._writer.get_config()["data_format"] == data_format
+    cache.done()
+    cache.merge()
+
+    dataset = StreamingDataset(
+        input_dir=str(tmpdir),
+        drop_last=True,
+        item_loader=TokensLoader(block_size=256),
+    )
+
+    for i in range(len(dataset)):
+        item = dataset[i]
+        assert torch.allclose(i * torch.ones(256).to(_TORCH_DTYPES_MAPPING[dtype_index_int]), item)
+
+
 def test_tokensloader_with_no_header_numpy_serializer(tmpdir):
     cache = Cache(str(tmpdir), chunk_size=512, item_loader=TokensLoader())
     assert isinstance(cache._reader._item_loader, TokensLoader)
